@@ -1,0 +1,302 @@
+import sys
+from pathlib import Path
+import math
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+
+
+from pumpia.module_handling.modules import BaseModule
+from pumpia.module_handling.fields.viewer_fields import MonochromeDicomViewerField
+from pumpia.module_handling.fields.roi_fields import LineROIField
+from pumpia.module_handling.fields.simple import IntField, BoolField, FloatField
+
+if str(Path(__file__).resolve().parent.parent) not in sys.path:
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from pumpia_acr_mri.medium.acr_mri_context import MedACRContextManager
+
+
+def square_wave_integral(x: np.ndarray | float, amp: float = 1, width: float = 1, offset: float = 0):
+    """
+    The integral of a square wave from 0 to x.
+    The square wave is defined by
+
+    amp (0 < x mod 2*width < width)
+    0 (width < x mod 2*width < 2*width)
+
+
+    Parameters
+    ----------
+    x : np.ndarray | float
+    amp : float, optional
+        Amplitude of the square wave.
+    width : float, optional
+        Width of a peak of the square wave.
+        The wavelength is 2*width.
+    offset : float, optional
+        The offset of the square wave.
+        If a mutiple of 2*width then it is equivelant to 0.
+
+    Returns
+    -------
+    The integral of the square wave up to x.
+    """
+    x = ((x - offset) / (2 * width)) - 0.5
+    zero_pt = ((0 - offset) / (2 * width)) - 0.5
+    integral = (amp
+                * width
+                * ((np.abs(0.5 + (x % 1))
+                   + np.abs(0.5 - (x % 1))
+                   + np.floor(x))
+                   + (np.abs(0.5 + (zero_pt % 1))
+                   + np.abs(0.5 - (zero_pt % 1))
+                      + np.floor(zero_pt))))
+    return integral
+
+
+def model_signal(pixel_width: float,
+                 offset: float,
+                 amplitude: float,
+                 wave_peak_width: float,
+                 num_peaks: int,
+                 sample_length: float) -> np.ndarray:
+    num_samples = round(sample_length // pixel_width)
+
+    points = np.arange(0, num_samples + 1, 1) * pixel_width
+    raw_signal = square_wave_integral(points, amplitude, wave_peak_width, offset)
+    raw_signal[points < offset] = square_wave_integral(offset, amplitude, wave_peak_width, offset)
+    max_point = offset + 2 * wave_peak_width * num_peaks
+    raw_signal[points > max_point] = square_wave_integral(max_point, amplitude, wave_peak_width, offset)
+    signal = np.diff(raw_signal)
+
+    return signal
+
+
+class ResolutionTest(BaseModule):
+    context_manager = MedACRContextManager()
+    title = "Resolution Test"
+
+    line = LineROIField()
+    num_peaks = IntField(4)
+    num_samples_per_peak = IntField(1)
+    roll = IntField(0)
+    padding = IntField(0)
+    show_absolute = BoolField()
+    show_real = BoolField(False)
+    show_imaginary = BoolField(False)
+
+    pixel_width = FloatField(0.9765625)
+    offset = FloatField()
+    amplitude = FloatField(1)
+    wave_peak_width = FloatField(1)
+    num_pins = IntField(4, verbose_name="Number of Peaks")
+    sample_length = FloatField(8)
+
+    num_widths = IntField(100, verbose_name="Number of Widths")
+    min_width = FloatField(0.6, verbose_name="Minimum Width")
+    max_width = FloatField(1, verbose_name="Maximum Width")
+    num_offsets = IntField(100, verbose_name="Number of Offsets")
+    min_offset = FloatField(-1, verbose_name="Minimum Offset")
+    max_offset = FloatField(1, verbose_name="Maximum Offset")
+
+    main = MonochromeDicomViewerField(0, 0)
+
+    def load_commands(self):
+        self.register_command("Show Profile", self.show_fft)
+        self.register_command("Show Pure FFT", self.pure_signal_fft)
+        self.register_command("Model Image Signal", self.model_phantom)
+        self.register_command("Heatmap", self.pixel_offset_heatmap)
+
+    def show_fft(self):
+        """
+        Shows the ROI profiles
+        """
+        if self.line.roi is not None:
+            if self.main.image is not None:
+                pixel_size = self.main.image.pixel_spacing
+                if pixel_size is None:
+                    return
+                y_size = pixel_size[0]
+                x_size = pixel_size[1]
+                line_len = math.sqrt((self.line.roi.x_len * x_size)**2 + (self.line.roi.y_len * y_size)**2)
+                d = line_len / (self.line.roi.profile.shape[0] - 1)
+                points = np.arange(0, self.line.roi.profile.shape[0], 1) * d
+
+                line_fft = np.fft.rfft(self.line.roi.profile, self.line.roi.profile.shape[0] * 2)
+                line_fft = line_fft / line_fft[0]
+                abs_fft = np.abs(line_fft)
+                real_fft = np.real(line_fft)
+                imag_fft = np.imag(line_fft)
+                locs = np.fft.rfftfreq(self.line.roi.profile.shape[0] * 2, d)
+
+                fig = plt.gcf()
+                fig.clear()
+                axes: tuple[Axes, Axes] = fig.subplots(2, 1)
+                sig_ax, fft_ax = axes
+
+                sig_ax.plot(points, self.line.roi.profile)
+
+                if self.show_absolute:
+                    fft_ax.plot(locs, abs_fft, label="Absolute")
+                if self.show_real:
+                    fft_ax.plot(locs, real_fft, label="Real")
+                if self.show_imaginary:
+                    fft_ax.plot(locs, imag_fft, label="Imaginary")
+
+                fft_ax.legend()
+                fft_ax.set_xlabel("Frequency ($mm^{-1}$)")
+                fft_ax.set_ylabel("Value")
+                fft_ax.set_title("ROI FFT")
+                fig.tight_layout()
+                fig.show()
+
+    def pure_signal_fft(self):
+        n = self.num_samples_per_peak
+        n_peaks = self.num_peaks
+        padding = self.padding
+        roll = self.roll
+        zeros = [0] * n
+        ones = [1] * n
+        signal = list(np.roll(((ones + zeros) * n_peaks), roll))
+        # point_5s = [0.5]
+        # signal = list(np.roll(((point_5s + ones + point_5s + zeros) * n_peaks), roll))
+        combo = ([0] * padding) + signal + ([0] * padding)
+        line = np.array(combo)
+        line_fft = np.fft.rfft(line)
+        line_fft = line_fft / line_fft[0]
+        abs_fft = np.abs(line_fft)
+        real_fft = np.real(line_fft)
+        imag_fft = np.imag(line_fft)
+        locs = np.fft.rfftfreq(line.shape[0]) * n
+
+        fig = plt.gcf()
+        fig.clear()
+        axes: tuple[Axes, Axes] = fig.subplots(2, 1)
+        sig_ax, fft_ax = axes
+
+        sig_ax.plot(combo)
+        sig_ax.set_title("Signal")
+
+        if self.show_absolute:
+            fft_ax.plot(locs, abs_fft, label="Absolute")
+        if self.show_real:
+            fft_ax.plot(locs, real_fft, label="Real")
+        if self.show_imaginary:
+            fft_ax.plot(locs, imag_fft, label="Imaginary")
+
+        fft_ax.legend()
+        fft_ax.set_xlabel("Frequency ($mm^{-1}$)")
+        fft_ax.set_ylabel("Value")
+        fft_ax.set_title("ROI FFT")
+        fig.tight_layout()
+        fig.show()
+
+    def model_phantom(self):
+        pixel_width = self.pixel_width
+        offset = self.offset
+        amplitude = self.amplitude
+        wave_peak_width = self.wave_peak_width
+        num_peaks = self.num_pins
+        sample_length = self.sample_length
+
+        num_samples = round(sample_length // pixel_width)
+
+        points = np.arange(0, num_samples + 1, 1) * pixel_width
+
+        signal = model_signal(pixel_width,
+                              offset,
+                              amplitude,
+                              wave_peak_width,
+                              num_peaks,
+                              sample_length)
+
+        fft_signal = np.fft.rfft(signal, 10 * signal.shape[0])
+        fft_signal = fft_signal / fft_signal[0]
+
+        abs_fft = np.abs(fft_signal)
+        real_fft = np.real(fft_signal)
+        imag_fft = np.imag(fft_signal)
+        locs = np.fft.rfftfreq(10 * signal.shape[0], d=pixel_width)
+        print(np.interp(0.5, locs, abs_fft))
+
+        fig = plt.gcf()
+        fig.clear()
+        axes: tuple[Axes, Axes] = fig.subplots(2, 1)
+        sig_ax, fft_ax = axes
+
+        sig_ax.plot(points[:-1], signal)
+        sig_ax.set_title("Signal")
+
+        if self.show_absolute:
+            fft_ax.plot(locs, abs_fft, label="Absolute")
+        if self.show_real:
+            fft_ax.plot(locs, real_fft, label="Real")
+        if self.show_imaginary:
+            fft_ax.plot(locs, imag_fft, label="Imaginary")
+
+        fft_ax.legend()
+        fft_ax.set_xlabel("Frequency ($mm^{-1}$)")
+        fft_ax.set_ylabel("Value")
+        fft_ax.set_title("ROI FFT")
+        fig.tight_layout()
+        fig.show()
+
+    def pixel_offset_heatmap(self):
+        num_widths = self.num_widths
+        min_widths = self.min_width
+        max_widths = self.max_width
+        num_offsets = self.num_offsets
+        min_offsets = self.min_offset
+        max_offsets = self.max_offset
+
+        pixel_width_indices: np.ndarray = np.arange(0, num_widths, 1)
+        offset_indices: np.ndarray = np.arange(0, num_offsets, 1)
+
+        results = np.zeros((num_widths, num_offsets))
+
+        max_points = np.zeros(num_widths)
+        pixel_widths = np.zeros(num_widths)
+
+        for p_i in pixel_width_indices:
+            pixel_width = min_widths + (p_i * (max_widths - min_widths) / num_widths)
+            if pixel_width > 0:
+                max_points[p_i] = ((8 // pixel_width) * 0.5
+                                   - (3.5 / pixel_width)
+                                   ) % 1 - 0.5
+                pixel_widths[p_i] = pixel_width
+                for o_i in offset_indices:
+                    offset = min_offsets + (o_i * (max_offsets - min_offsets) / num_offsets)
+                    signal = model_signal(pixel_width,
+                                          offset,
+                                          1,
+                                          1,
+                                          4,
+                                          8)
+                    fft_signal = np.fft.rfft(signal, 2 * signal.shape[0])
+                    abs_fft = np.abs(fft_signal)
+                    if abs_fft[0] != 0:
+                        abs_fft = abs_fft / abs_fft[0]
+                        locs = np.fft.rfftfreq(2 * signal.shape[0], d=pixel_width)
+                        results[p_i, o_i] = np.interp(0.5, locs, abs_fft)
+
+        results = results[::-1]
+        fig = plt.gcf()
+        fig.clear()
+        heatmap_axes = fig.subplots(1, 1)
+
+        heatmap = heatmap_axes.imshow(results, interpolation='none',
+                                      extent=(min_offsets, max_offsets, min_widths, max_widths),
+                                      aspect='auto')
+        heatmap_axes.plot(max_points, pixel_widths)
+        heatmap_axes.set_ylabel("Pixel Width (mm)")
+        heatmap_axes.set_xlabel("Offset (mm)")
+        heatmap_axes.set_title("0.5$mm^{-1}$ Frequency Ratio")
+        fig.colorbar(heatmap, ax=heatmap_axes)
+        fig.tight_layout()
+        fig.show()
+
+
+if __name__ == "__main__":
+    ResolutionTest.run()
