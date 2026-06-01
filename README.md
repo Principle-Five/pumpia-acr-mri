@@ -24,7 +24,7 @@ To run the collection:
 
 OR
 
-install from [PyPI](https://pypi.org/project/pumpia-acr-mri/) it using pip:
+install from [PyPI](https://pypi.org/project/pumpia-acr-mri/) using pip:
 
     pip install pumpia-acr-mri
 
