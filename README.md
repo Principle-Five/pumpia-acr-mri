@@ -20,7 +20,15 @@ Users should make themselves familiar with the [PumpIA user interface](https://p
 To run the collection:
 1. Clone the repository
 2. Use an environment manager to install the requirements from `requirements.txt` or install the requirements using the command `pip install -r requirements.txt` when in the repository directory
-3. Run the `run_med_acr_rpt_collection.py` script
+3. Run the relevant script in pumpia_acr_mri/scripts
+
+OR
+
+install from [PyPI](https://pypi.org/project/pumpia-acr-mri/) it using pip:
+
+    pip install pumpia-acr-mri
+
+And run using the commands `pumpia-acr-mri-l-old` for the old large phantom (pre new geometry grid/slice 5) `pumpia-acr-mri-l` for the large phantom and `pumpia-acr-mri-m` for the medium phantom (making sure you are in the right environment if used for the pip install).
 
 To use the collection:
 1. Load the folder with the relevant images
@@ -126,7 +134,7 @@ There are two methods available for calculating the resolution in the image, the
 The results provided are the maximum calculated for each horizontal and vertical line ROI within the main ROI surrounding the insert that meets the following conditions:
 
 1. $length == floor\bigg(\frac{8}{pixel size}\bigg)$
-2. $count\bigg(pixels\gt max(box\ ROI)*\frac{resolution\ percentage}{100}\bigg)>4$
+2. At least 1 pixel within 2mm of either end has $signal \gt max(box\ ROI)*\frac{resolution\ percentage}{100}$
 
 An average of the horizontal and vertical contrasts is reported on the main tab, as well as a theoretical maximum for an 'ideal' offset.
 
@@ -165,8 +173,8 @@ it is therefore possible to measure a higher resolution than the theoretical max
 
 # Calculating The Context
 
-The context for this phantom is calculated as follows (selecting `show boxes` allows some of this working to be seen):
-1. A profile of the slice averages is found, the minimum value is the geometric accuracy slice.
+The context for this phantom is calculated as follows (selecting `show boxes` in the context menu allows some of this working to be seen):
+1. A profile of the slice averages is found, the minimum value is the inserts slice for the old large phantom or the geometric accuracy slice for the new large and medium phantom.
 2. The boundary of the phantom is found
 3. Four boxes are offset horizontally and vertically from the centre and their average value used to find the location of the resolution inserts (opposite the maximum value)
 4. Two boxes are drawn between the centre and the corners opposite the resolution inserts. The one with the minimum value is where the circle insert is.

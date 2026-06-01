@@ -6,4 +6,4 @@ class LargeACRContextManager(ACRMRIContextManager):
     Context Manager for Large ACR Phantom.
     """
     FIVE_BOX_OFFSET = 33
-    MIN_SLICE = 4
+    MIN_SLICE = 0

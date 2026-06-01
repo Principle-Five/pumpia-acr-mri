@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pumpia-acr-mri"
+version = "0.0.1"
+authors = [{ name = "Zack Ravetz et al." }]
+description = "ACR MRI phantom analysis based using the PumpIA framework."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pumpia == 0.6.*, >=0.6.7",
+    "scipy",
+    "numpy",
+    "pylibjpeg[all]",
+    "matplotlib",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+    "Intended Audience :: Science/Research",
+    'License :: OSI Approved :: BSD License',
+    'Topic :: Software Development',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Scientific/Engineering :: Image Processing',
+]
+
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://www.principlefive.org.uk/"
+Documentation = "https://github.com/Principle-Five/pumpia-acr-mri"
+Source = "https://github.com/Principle-Five/pumpia-acr-mri"
+Issues = "https://github.com/Principle-Five/pumpia-acr-mri/issues"
+
+[tool.hatch.build.targets.sdist]
+include = ["pumpia_acr_mri*"]
+
+[project.gui-scripts]
+pumpia-acr-mri-l-old = "pumpia_acr_mri.scripts.run_large_acr_rpt_old:run_large_acr"
+pumpia-acr-mri-l = "pumpia_acr_mri.scripts.run_large_acr_rpt:run_large_acr"
+pumpia-acr-mri-m = "pumpia_acr_mri.scripts.run_med_acr_rpt:run_med_acr"

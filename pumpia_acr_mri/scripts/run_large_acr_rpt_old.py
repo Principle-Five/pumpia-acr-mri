@@ -1,4 +1,4 @@
-from pumpia_acr_mri.large.acr_mri_rpt_collection import LargeACRrptCollection
+from pumpia_acr_mri.large_old.acr_mri_rpt_collection import LargeACRrptCollection
 
 
 def run_large_acr():
