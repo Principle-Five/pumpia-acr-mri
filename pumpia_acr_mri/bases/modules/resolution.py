@@ -2,8 +2,10 @@
 Calculates the contrast of the 1 mm resolution insert.
 """
 import math
+from typing import Literal
 import numpy as np
 from scipy.optimize import minimize_scalar
+
 
 from pumpia.module_handling.modules import PhantomModule
 from pumpia.module_handling.fields.roi_fields import LineROIField, RectangleROIField
@@ -20,11 +22,6 @@ from pumpia.utilities.array_utils import nth_max_bounds
 
 from pumpia_acr_mri.bases.acr_mri_context import ACRMRIContextManager, ACRMRIContext
 
-BOX_Y_OFFSET = 28
-BOX_X_OFFSET = -5
-BOX_SIDE_LENGTH = 19
-POINT_SEP = 1
-NUM_PINS = 4
 FFT_MULT = 10
 
 
@@ -205,6 +202,12 @@ class ACRMRIResolution(PhantomModule):
     """
     Calculates the contrast of the 1mm resolution insert.
     """
+    BOX_Y_OFFSET: Literal[28, 30]
+    BOX_X_OFFSET: Literal[-5, 0]
+    BOX_SIDE_LENGTH = 19
+    POINT_SEP = 1
+    NUM_PINS = 4
+
     context_manager: ACRMRIContextManager
     show_draw_rois_button = True
     show_analyse_button = True
@@ -270,8 +273,8 @@ class ACRMRIResolution(PhantomModule):
         else:
             self.phase_dir = ""
 
-        box_height = BOX_SIDE_LENGTH / pixel_height
-        box_width = BOX_SIDE_LENGTH / pixel_width
+        box_height = self.BOX_SIDE_LENGTH / pixel_height
+        box_width = self.BOX_SIDE_LENGTH / pixel_width
 
         x_offset = 0
         y_offset = 0
@@ -279,36 +282,36 @@ class ACRMRIResolution(PhantomModule):
         vertical_dir = ["D", "R"]
 
         if context.res_insert_side == "right":
-            x_offset = BOX_Y_OFFSET / pixel_width
+            x_offset = self.BOX_Y_OFFSET / pixel_width
             horizontal_dir[1] = "R"
             vertical_dir[1] = "L"
         elif context.res_insert_side == "left":
-            x_offset = -BOX_Y_OFFSET / pixel_width - box_width
+            x_offset = -self.BOX_Y_OFFSET / pixel_width - box_width
             horizontal_dir[1] = "L"
             vertical_dir[1] = "R"
         elif context.res_insert_side == "top":
-            y_offset = -BOX_Y_OFFSET / pixel_height - box_height
+            y_offset = -self.BOX_Y_OFFSET / pixel_height - box_height
             horizontal_dir[0] = "D"
             vertical_dir[0] = "U"
         else:
-            y_offset = BOX_Y_OFFSET / pixel_height
+            y_offset = self.BOX_Y_OFFSET / pixel_height
             horizontal_dir[0] = "U"
             vertical_dir[0] = "D"
 
         if context.circle_insert_side == "top":
-            y_offset = BOX_X_OFFSET / pixel_height
+            y_offset = self.BOX_X_OFFSET / pixel_height
             horizontal_dir[0] = "D"
             vertical_dir[0] = "U"
         elif context.circle_insert_side == "bottom":
-            y_offset = -BOX_X_OFFSET / pixel_height - box_width
+            y_offset = -self.BOX_X_OFFSET / pixel_height - box_width
             horizontal_dir[0] = "U"
             vertical_dir[0] = "D"
         elif context.circle_insert_side == "right":
-            x_offset = -BOX_X_OFFSET / pixel_width - box_width
+            x_offset = -self.BOX_X_OFFSET / pixel_width - box_width
             horizontal_dir[1] = "R"
             vertical_dir[1] = "L"
         else:
-            x_offset = BOX_X_OFFSET / pixel_width
+            x_offset = self.BOX_X_OFFSET / pixel_width
             horizontal_dir[1] = "L"
             vertical_dir[1] = "R"
 
@@ -324,12 +327,12 @@ class ACRMRIResolution(PhantomModule):
                                                 box_height))
 
         horizontal_line_length = math.floor(2
-                                            * NUM_PINS
-                                            * POINT_SEP
+                                            * self.NUM_PINS
+                                            * self.POINT_SEP
                                             / self.pixel_size_horizontal)
         vertical_line_length = math.floor(2
-                                          * NUM_PINS
-                                          * POINT_SEP
+                                          * self.NUM_PINS
+                                          * self.POINT_SEP
                                           / self.pixel_size_vertical)
         self.horizontal_line.register_roi(LineROI(image,
                                                   box_xmin,
@@ -351,22 +354,22 @@ class ACRMRIResolution(PhantomModule):
     def analyse(self, batch: bool = False):
         horizontal_max_contrast: float = 0
         vertical_max_contrast: float = 0
-        contrast_frequency = 1 / (2 * POINT_SEP)
+        contrast_frequency = 1 / (2 * self.POINT_SEP)
         horizontal_line_length = math.floor(2
-                                            * NUM_PINS
-                                            * POINT_SEP
+                                            * self.NUM_PINS
+                                            * self.POINT_SEP
                                             / self.pixel_size_horizontal)
 
         if self.resolution_type == "FFT":
             self.best_contrast = 100 * maximum_frequency_ratio(self.pixel_size_horizontal,
-                                                               POINT_SEP,
-                                                               NUM_PINS,
+                                                               self.POINT_SEP,
+                                                               self.NUM_PINS,
                                                                horizontal_line_length,
                                                                contrast_frequency)
         else:
             self.best_contrast = 100 * maximum_contrast_ratio(self.pixel_size_horizontal,
-                                                              POINT_SEP,
-                                                              NUM_PINS,
+                                                              self.POINT_SEP,
+                                                              self.NUM_PINS,
                                                               horizontal_line_length)
 
         if self.auto_position_lines:
@@ -383,8 +386,8 @@ class ACRMRIResolution(PhantomModule):
             horizontal_max_position: tuple[int, int] = 0, 0
             vertical_max_position: tuple[int, int] = 0, 0
             vertical_line_length = math.floor(2
-                                              * NUM_PINS
-                                              * POINT_SEP
+                                              * self.NUM_PINS
+                                              * self.POINT_SEP
                                               / self.pixel_size_vertical)
             xmax = roi.width - horizontal_line_length
             ymax = roi.height - vertical_line_length
@@ -396,7 +399,7 @@ class ACRMRIResolution(PhantomModule):
                         profile = roi.pixel_array[y, x:x + horizontal_line_length]
                         pin_locs: np.ndarray[tuple[int, ...],
                                              np.dtypes.BoolDType] = profile >= line_min_vals
-                        within_loc = math.ceil(2 * POINT_SEP / self.pixel_size_horizontal)
+                        within_loc = math.ceil(2 * self.POINT_SEP / self.pixel_size_horizontal)
                         if ((np.sum(pin_locs[:within_loc]) >= 1
                                 and np.sum(pin_locs[-within_loc:]) >= 1)
                                 and (pin_locs[0] or pin_locs[-1])):
@@ -413,7 +416,7 @@ class ACRMRIResolution(PhantomModule):
                         profile = roi.pixel_array[y:y + vertical_line_length, x]
                         pin_locs: np.ndarray[tuple[int, ...],
                                              np.dtypes.BoolDType] = profile >= line_min_vals
-                        within_loc = math.ceil(2 * POINT_SEP / self.pixel_size_vertical)
+                        within_loc = math.ceil(2 * self.POINT_SEP / self.pixel_size_vertical)
                         if ((np.sum(pin_locs[:within_loc]) >= 1
                                 and np.sum(pin_locs[-within_loc:]) >= 1)
                                 and (pin_locs[0] or pin_locs[-1])):

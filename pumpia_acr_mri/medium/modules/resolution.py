@@ -10,4 +10,6 @@ class MedACRResolution(ACRMRIResolution):
     """
     Calculates the contrast of the 1mm resolution insert.
     """
+    BOX_Y_OFFSET = 28
+    BOX_X_OFFSET = -5
     context_manager = MedACRContextManager()

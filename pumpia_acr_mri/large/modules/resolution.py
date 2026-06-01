@@ -10,4 +10,6 @@ class LargeACRResolution(ACRMRIResolution):
     """
     Calculates the contrast of the 1mm resolution insert.
     """
+    BOX_Y_OFFSET = 30
+    BOX_X_OFFSET = 0
     context_manager = LargeACRContextManager()
