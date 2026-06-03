@@ -2,7 +2,7 @@
 This repository contains code to analyse the ACR MRI phantoms using the [PumpIA](https://github.com/Principle-Five/pumpia) framework.
 It uses the subtraction SNR method and therefore expects a repeat image, however all modules except the SNR module will run with a single image.
 
-It is currently not validated and is provided as is, see the license for more information.
+It is in the process of being validated and is provided as is, see the license for more information.
 
 The collection contains the following tests:
 - SNR
@@ -14,10 +14,11 @@ The collection contains the following tests:
 - Resolution (Contrast of 1mm insert)
 
 # Usage
+**Important:**
+Users should make themselves familiar with the [PumpIA user interface](https://principle-five.github.io/pumpia/usage/user_interface.html).
 
-Users should make themselves familiar with the [PumpIA user interface](https://principle-five.github.io/pumpia/usage/user_interface.html)
+## Installation
 
-To run the collection:
 1. Clone the repository
 2. Use an environment manager to install the requirements from `requirements.txt` or install the requirements using the command `pip install -r requirements.txt` when in the repository directory
 3. Run the relevant script in pumpia_acr_mri/scripts
@@ -30,7 +31,8 @@ install from [PyPI](https://pypi.org/project/pumpia-acr-mri/) using pip:
 
 And run using the commands `pumpia-acr-mri-l-old` for the old large phantom (pre new geometry grid/slice 5) `pumpia-acr-mri-l` for the large phantom and `pumpia-acr-mri-m` for the medium phantom (making sure you are in the right environment if used for the pip install).
 
-To use the collection:
+## Running the Collection
+
 1. Load the folder with the relevant images
 2. Drag and drop the series containing the ACR images into the left viewer of the `Main` tab
 3. Drag and drop the series containing repeat images into the right viewer of the `Main` tab
@@ -40,6 +42,8 @@ To use the collection:
 6. Move any ROIs as required, this should be done through their relevant modules.
     - Re-run analysis
 7. Copy the results in the relevant format. Horizontal is tab separated, vertical is new line separated.
+
+SNR results are seperate from the other tests in the main results tab, this is so a single series can be ran in the left viewer (context is calculated from the image in this viewer) and relevant results for single image tests found.
 
 ## Correcting Context
 
@@ -113,6 +117,7 @@ A * exp \bigg(-\frac{(x-b)^2}{2\sigma^2}\bigg) + offset & b \lt x
 
 The percentage of A that the width is taken at can be provided ny the user, the default is 50%.
 Users can also override the $tan$ of the ramp angle, this is not recommended and is defaulted to 0.1 as defined in ACR guidance.
+The uniformity correction uses the profiles of ROIs directly above and below the slice width insert as a proxy for the non-uniformity across the ramps.
 
 A button is provided to show the profiles of the ROIs used and the fits calculated using the selected method.
 

@@ -13,7 +13,8 @@ from pumpia.module_handling.fields.viewer_fields import MonochromeDicomViewerFie
 from pumpia.module_handling.fields.simple import (PercField,
                                                   FloatField,
                                                   StringField,
-                                                  OptionField)
+                                                  OptionField,
+                                                  BoolField)
 from pumpia.image_handling.roi_structures import RectangleROI
 from pumpia.file_handling.dicom_structures import Series, Instance
 from pumpia.utilities.array_utils import nth_max_widest_peak
@@ -26,6 +27,8 @@ ROI_HEIGHT = 2
 ROI_WIDTH = 120
 BOTTOM_OFFSET = 0.5
 TOP_OFFSET = -3.5
+BOTTOM_UNI_OFFSET = 7.5
+TOP_UNI_OFFSET = -8.5
 
 fit_options: dict[str, Callable] = {"Flat Top Gaussian": flat_top_gauss,
                                     "Split Gaussian": split_gauss}
@@ -46,8 +49,10 @@ class ACRMRISliceWidth(PhantomModule):
     viewer = MonochromeDicomViewerField(row=0, column=0)
 
     tan_theta = FloatField(0.1, verbose_name="Tan of ramp angle")
-    max_perc = PercField(50, verbose_name="Width position (% of max)")
+    max_perc = PercField(50, verbose_name="Height for peak finding (% of max)")
+    width_def = PercField(50, verbose_name="Result width position (% of max)")
     fit_type = OptionField(fit_options, "Flat Top Gaussian")
+    uniformity_correct = BoolField()
 
     ramp_dir = StringField(verbose_name="Ramp Direction", read_only=True)
 
@@ -66,6 +71,8 @@ class ACRMRISliceWidth(PhantomModule):
 
     top_ramp = RectangleROIField()
     bottom_ramp = RectangleROIField()
+    top_uniformity = RectangleROIField()
+    bottom_uniformity = RectangleROIField()
 
     def draw_rois(self, context: ACRMRIContext, batch: bool = False) -> None:
 
@@ -85,7 +92,10 @@ class ACRMRISliceWidth(PhantomModule):
         pixel_height = pixel_size[0]
         pixel_width = pixel_size[1]
 
-        self.expected_width = pixel_size[0]
+        slice_thickness = self.viewer.image.slice_thickness
+        if slice_thickness is None:
+            return
+        self.expected_width = slice_thickness
 
         if context.res_insert_side == "bottom" or context.res_insert_side == "top":
             self.ramp_dir = "Horizontal"
@@ -93,40 +103,64 @@ class ACRMRISliceWidth(PhantomModule):
             box_width = ROI_WIDTH / pixel_width
             top_pix_offset = TOP_OFFSET / pixel_height
             bottom_pix_offset = BOTTOM_OFFSET / pixel_height
+            top_uni_pix_offset = TOP_UNI_OFFSET / pixel_height
+            bottom_uni_pix_offset = BOTTOM_UNI_OFFSET / pixel_height
 
             top_xmin = bottom_xmin = round(context.xcent - box_width / 2)
             top_xmax = bottom_xmax = round(context.xcent + box_width / 2)
+            top_uni_xmin = bottom_uni_xmin = round(context.xcent - box_width / 2)
+            top_uni_xmax = bottom_uni_xmax = round(context.xcent + box_width / 2)
 
             if context.res_insert_side == "bottom":
                 top_ymin = round(context.ycent + top_pix_offset)
                 top_ymax = round(context.ycent + top_pix_offset + box_height)
                 bottom_ymin = round(context.ycent + bottom_pix_offset)
                 bottom_ymax = round(context.ycent + bottom_pix_offset + box_height)
+                top_uni_ymin = round(context.ycent + top_uni_pix_offset)
+                top_uni_ymax = round(context.ycent + top_uni_pix_offset + box_height)
+                bottom_uni_ymin = round(context.ycent + bottom_uni_pix_offset)
+                bottom_uni_ymax = round(context.ycent + bottom_uni_pix_offset + box_height)
             else:
                 top_ymin = round(context.ycent - top_pix_offset - box_height)
                 top_ymax = round(context.ycent - top_pix_offset)
                 bottom_ymin = round(context.ycent - bottom_pix_offset - box_height)
                 bottom_ymax = round(context.ycent - bottom_pix_offset)
+                top_uni_ymin = round(context.ycent - top_uni_pix_offset - box_height)
+                top_uni_ymax = round(context.ycent - top_uni_pix_offset)
+                bottom_uni_ymin = round(context.ycent - bottom_uni_pix_offset - box_height)
+                bottom_uni_ymax = round(context.ycent - bottom_uni_pix_offset)
         else:
             self.ramp_dir = "Vertical"
             box_height = ROI_HEIGHT / pixel_width
             box_width = ROI_WIDTH / pixel_height
             top_pix_offset = TOP_OFFSET / pixel_width
             bottom_pix_offset = BOTTOM_OFFSET / pixel_width
+            top_uni_pix_offset = TOP_UNI_OFFSET / pixel_width
+            bottom_uni_pix_offset = BOTTOM_UNI_OFFSET / pixel_width
 
             top_ymin = bottom_ymin = round(context.ycent - box_width / 2)
             top_ymax = bottom_ymax = round(context.ycent + box_width / 2)
+            top_uni_ymin = bottom_uni_ymin = round(context.ycent - box_width / 2)
+            top_uni_ymax = bottom_uni_ymax = round(context.ycent + box_width / 2)
 
             if context.res_insert_side == "right":
                 top_xmin = round(context.xcent + top_pix_offset)
                 top_xmax = round(context.xcent + top_pix_offset + box_height)
                 bottom_xmin = round(context.xcent + bottom_pix_offset)
                 bottom_xmax = round(context.xcent + bottom_pix_offset + box_height)
+                top_uni_xmin = round(context.xcent + top_uni_pix_offset)
+                top_uni_xmax = round(context.xcent + top_uni_pix_offset + box_height)
+                bottom_uni_xmin = round(context.xcent + bottom_uni_pix_offset)
+                bottom_uni_xmax = round(context.xcent + bottom_uni_pix_offset + box_height)
             else:
                 top_xmin = round(context.xcent - top_pix_offset - box_height)
                 top_xmax = round(context.xcent - top_pix_offset)
                 bottom_xmin = round(context.xcent - bottom_pix_offset - box_height)
                 bottom_xmax = round(context.xcent - bottom_pix_offset)
+                top_uni_xmin = round(context.xcent - top_uni_pix_offset - box_height)
+                top_uni_xmax = round(context.xcent - top_uni_pix_offset)
+                bottom_uni_xmin = round(context.xcent - bottom_uni_pix_offset - box_height)
+                bottom_uni_xmax = round(context.xcent - bottom_uni_pix_offset)
 
         top_roi = RectangleROI(image,
                                top_xmin,
@@ -146,15 +180,38 @@ class ACRMRISliceWidth(PhantomModule):
                                   replace=True)
         self.bottom_ramp.register_roi(bottom_roi)
 
+        top_uni_roi = RectangleROI(image,
+                                   top_uni_xmin,
+                                   top_uni_ymin,
+                                   top_uni_xmax - top_uni_xmin,
+                                   top_uni_ymax - top_uni_ymin,
+                                   slice_num=image.current_slice,
+                                   replace=True)
+        self.top_uniformity.register_roi(top_uni_roi)
+
+        bottom_uni_roi = RectangleROI(image,
+                                      bottom_uni_xmin,
+                                      bottom_uni_ymin,
+                                      bottom_uni_xmax - bottom_uni_xmin,
+                                      bottom_uni_ymax - bottom_uni_ymin,
+                                      slice_num=image.current_slice,
+                                      replace=True)
+        self.bottom_uniformity.register_roi(bottom_uni_roi)
+
     def post_roi_register(self, roi_input: RectangleROIField):
         if (roi_input.roi is not None
             and self.manager is not None
-                and (roi_input is self.top_ramp or roi_input is self.bottom_ramp)):
+                and (roi_input is self.top_ramp
+                     or roi_input is self.bottom_ramp
+                     or roi_input is self.bottom_uniformity
+                     or roi_input is self.top_uniformity)):
             self.manager.add_roi(roi_input.roi)
 
     def analyse(self, batch: bool = False):
         if (self.top_ramp.roi is not None
             and self.bottom_ramp.roi is not None
+            and self.bottom_uniformity.roi is not None
+            and self.top_uniformity.roi is not None
                 and self.viewer.image is not None):
             pixel_spacing = self.viewer.image.pixel_spacing
             if pixel_spacing is None:
@@ -162,11 +219,22 @@ class ACRMRISliceWidth(PhantomModule):
             if self.ramp_dir[0].lower() == "v":
                 top_prof = self.top_ramp.roi.v_profile
                 bottom_prof = self.bottom_ramp.roi.v_profile
+                top_uni_prof = self.top_uniformity.roi.v_profile
+                bottom_uni_prof = self.bottom_uniformity.roi.v_profile
                 pix_size = pixel_spacing[0]
             else:
                 top_prof = self.top_ramp.roi.h_profile
                 bottom_prof = self.bottom_ramp.roi.h_profile
+                top_uni_prof = self.top_uniformity.roi.h_profile
+                bottom_uni_prof = self.bottom_uniformity.roi.h_profile
                 pix_size = pixel_spacing[1]
+
+            if self.uniformity_correct:
+                top_uni_prof = top_uni_prof / np.max(top_uni_prof)
+                bottom_uni_prof = bottom_uni_prof / np.max(bottom_uni_prof)
+                # avg_uni_prof = (top_uni_prof + bottom_uni_prof) / 2
+                top_prof = top_prof / top_uni_prof
+                bottom_prof = bottom_prof / bottom_uni_prof
 
             slice_thickness = self.viewer.image.slice_thickness
             if slice_thickness is None:
@@ -176,7 +244,8 @@ class ACRMRISliceWidth(PhantomModule):
             if self.fit_type is split_gauss:
                 # reciprocal would require a negative in c_coeff
                 divisor = 100 / self.max_perc
-                c_coeff = math.sqrt(2 * math.log(divisor))
+                width_divisor = 100 / self.width_def
+                c_coeff = math.sqrt(2 * math.log(width_divisor))
 
                 top_fwhm_peak = nth_max_widest_peak(top_prof, divisor)
                 bottom_fwhm_peak = nth_max_widest_peak(bottom_prof, divisor)
@@ -222,6 +291,7 @@ class ACRMRISliceWidth(PhantomModule):
             else:
                 # reciprocal would require a negative in coeffs
                 divisor = 100 / self.max_perc
+                width_divisor = 100 / self.width_def
 
                 top_fwhm_peak = nth_max_widest_peak(top_prof, divisor)
                 bottom_fwhm_peak = nth_max_widest_peak(bottom_prof, divisor)
@@ -239,7 +309,7 @@ class ACRMRISliceWidth(PhantomModule):
                                        top_prof,
                                        top_init,
                                        bounds=bounds)
-                top_coeff = math.sqrt(2 * math.pow(math.log(divisor), 1 / top_fit[3]))
+                top_coeff = math.sqrt(2 * math.pow(math.log(width_divisor), 1 / top_fit[3]))
                 top_fwhm = 2 * top_coeff * top_fit[1]
 
                 bottom_init = ((bottom_fwhm_peak.maximum + bottom_fwhm_peak.minimum) / 2,
@@ -253,7 +323,7 @@ class ACRMRISliceWidth(PhantomModule):
                                           bottom_prof,
                                           bottom_init,
                                           bounds=bounds)
-                bottom_coeff = math.sqrt(2 * math.pow((2 * math.log(divisor)), 1 / bottom_fit[3]))
+                bottom_coeff = math.sqrt(2 * math.pow((2 * math.log(width_divisor)), 1 / bottom_fit[3]))
                 bottom_fwhm = 2 * bottom_coeff * bottom_fit[1]
 
                 tan_theta = self.tan_theta
@@ -275,6 +345,8 @@ class ACRMRISliceWidth(PhantomModule):
         """
         if (self.top_ramp.roi is not None
             and self.bottom_ramp.roi is not None
+            and self.bottom_uniformity.roi is not None
+            and self.top_uniformity.roi is not None
                 and self.viewer.image is not None):
             pixel_spacing = self.viewer.image.pixel_spacing
             if pixel_spacing is None:
@@ -282,11 +354,22 @@ class ACRMRISliceWidth(PhantomModule):
             if self.ramp_dir[0].lower() == "v":
                 top_prof = self.top_ramp.roi.v_profile
                 bottom_prof = self.bottom_ramp.roi.v_profile
+                top_uni_prof = self.top_uniformity.roi.v_profile
+                bottom_uni_prof = self.bottom_uniformity.roi.v_profile
                 pix_size = pixel_spacing[0]
             else:
                 top_prof = self.top_ramp.roi.h_profile
                 bottom_prof = self.bottom_ramp.roi.h_profile
+                top_uni_prof = self.top_uniformity.roi.h_profile
+                bottom_uni_prof = self.bottom_uniformity.roi.h_profile
                 pix_size = pixel_spacing[1]
+
+            if self.uniformity_correct:
+                top_uni_prof = top_uni_prof / np.max(top_uni_prof)
+                bottom_uni_prof = bottom_uni_prof / np.max(bottom_uni_prof)
+                # avg_uni_prof = (top_uni_prof + bottom_uni_prof) / 2
+                top_prof = top_prof / top_uni_prof
+                bottom_prof = bottom_prof / bottom_uni_prof
 
             tan_theta = self.tan_theta
 
