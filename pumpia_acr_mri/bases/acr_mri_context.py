@@ -138,7 +138,6 @@ class ACRMRIContextManager(AutoPhantomManager):
                          direction=direction,
                          text=text,
                          **kw)
-        self.auto_phantom_manager: AutoPhantomManager
         self.inserts_frame: ttk.Labelframe
 
         self.inserts_slice_var: tk.StringVar
@@ -157,18 +156,7 @@ class ACRMRIContextManager(AutoPhantomManager):
         self.show_boxes_button: ttk.Checkbutton
 
     def _complete_setup(self):
-        self.auto_phantom_manager = AutoPhantomManager(self,
-                                                       manager=self.manager,
-                                                       mode=self.mode,
-                                                       sensitivity=self.sensitivity,
-                                                       top_perc=self.top_perc,
-                                                       iterations=self.iterations,
-                                                       cull_perc=self.cull_perc,
-                                                       bubble_offset=self.bubble_offset,
-                                                       bubble_side=self.bubble_side,
-                                                       direction=self.direction,
-                                                       text="Bound Box Options",
-                                                       **self.kw)
+        super()._complete_setup()
 
         self.inserts_frame = ttk.Labelframe(self, text="Inserts")
 
@@ -209,11 +197,11 @@ class ACRMRIContextManager(AutoPhantomManager):
         self.show_boxes_button.grid(column=0, row=3, columnspan=2, sticky="nsew")
 
         if self.direction[0].lower() == "h":
-            self.auto_phantom_manager.grid(column=0, row=0, sticky="nsew")
-            self.inserts_frame.grid(column=1, row=0, sticky="nsew")
+            column = self.grid_size()[0]
+            self.inserts_frame.grid(column=column, row=0, sticky="nsew")
         else:
-            self.auto_phantom_manager.grid(column=0, row=0, sticky="nsew")
-            self.inserts_frame.grid(column=0, row=1, sticky="nsew")
+            row = self.grid_size()[1]
+            self.inserts_frame.grid(column=0, row=row, sticky="nsew")
 
     def get_context(self, image: Series | Instance) -> ACRMRIContext:
         if isinstance(image, Instance):
@@ -222,7 +210,7 @@ class ACRMRIContextManager(AutoPhantomManager):
         if image.num_slices != 11:
             raise ValueError("Expected ACR Image with 11 slices")
 
-        if self.auto_phantom_manager.mode_var.get() == "fine tune":
+        if self.mode_var.get() == "fine tune":
             inserts_slice = inserts_slice_map[self.inserts_slice_var.get()]  # pyright: ignore[reportArgumentType]
         else:
             min_slice = np.argmin(image.z_profile)
@@ -236,12 +224,12 @@ class ACRMRIContextManager(AutoPhantomManager):
 
         inserts_image = image.instances[inserts_slice]
 
-        boundary_context = self.auto_phantom_manager.get_context(inserts_image)
+        boundary_context = super().get_context(inserts_image)
 
         res_insert_side: SideType
         circle_insert_side: SideType
 
-        if self.auto_phantom_manager.mode_var.get() == "fine tune":
+        if self.mode_var.get() == "fine tune":
             res_insert_side = side_map[self.res_insert_var.get()]
             circle_insert_side = side_map[self.circle_insert_var.get()]
             return ACRMRIContext(boundary_context.xmin,

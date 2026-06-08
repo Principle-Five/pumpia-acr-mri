@@ -21,7 +21,7 @@ Users should make themselves familiar with the [PumpIA user interface](https://p
 
 1. Clone the repository
 2. Use an environment manager to install the requirements from `requirements.txt` or install the requirements using the command `pip install -r requirements.txt` when in the repository directory
-3. Run the relevant script in pumpia_acr_mri/scripts
+3. Run the relevant script in /Testing
 
 OR
 
