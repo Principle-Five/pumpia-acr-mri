@@ -24,7 +24,7 @@ from pumpia_acr_mri.bases.acr_mri_context import ACRMRIContextManager, ACRMRICon
 
 # ROI sizes in mm
 ROI_HEIGHT = 2
-ROI_WIDTH = 150
+ROI_WIDTH = 120
 BOTTOM_OFFSET = 1
 TOP_OFFSET = -3.5
 BOTTOM_UNI_OFFSET = 8.5
