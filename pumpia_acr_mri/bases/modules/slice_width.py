@@ -24,11 +24,11 @@ from pumpia_acr_mri.bases.acr_mri_context import ACRMRIContextManager, ACRMRICon
 
 # ROI sizes in mm
 ROI_HEIGHT = 2
-ROI_WIDTH = 120
-BOTTOM_OFFSET = 0.5
+ROI_WIDTH = 150
+BOTTOM_OFFSET = 1
 TOP_OFFSET = -3.5
-BOTTOM_UNI_OFFSET = 7.5
-TOP_UNI_OFFSET = -8.5
+BOTTOM_UNI_OFFSET = 8.5
+TOP_UNI_OFFSET = -10
 
 fit_options: dict[str, Callable] = {"Flat Top Gaussian": flat_top_gauss,
                                     "Split Gaussian": split_gauss}
@@ -323,7 +323,7 @@ class ACRMRISliceWidth(PhantomModule):
                                           bottom_prof,
                                           bottom_init,
                                           bounds=bounds)
-                bottom_coeff = math.sqrt(2 * math.pow((2 * math.log(width_divisor)), 1 / bottom_fit[3]))
+                bottom_coeff = math.sqrt(2 * math.pow(math.log(width_divisor), 1 / bottom_fit[3]))
                 bottom_fwhm = 2 * bottom_coeff * bottom_fit[1]
 
                 tan_theta = self.tan_theta
