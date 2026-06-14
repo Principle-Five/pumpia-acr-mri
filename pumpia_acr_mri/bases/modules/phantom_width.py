@@ -8,7 +8,8 @@ from typing import Literal
 from pumpia.module_handling.modules import PhantomModule
 from pumpia.module_handling.fields.roi_fields import LineROIField
 from pumpia.module_handling.fields.viewer_fields import MonochromeDicomViewerField
-from pumpia.module_handling.fields.simple import PercField, FloatField, BoolField
+from pumpia.widgets.viewers import MonochromeDicomViewer
+from pumpia.module_handling.fields.simple import PercField, FloatField, BoolField, StringField
 from pumpia.image_handling.roi_structures import LineROI
 from pumpia.file_handling.dicom_structures import Series, Instance
 from pumpia.utilities.array_utils import nth_max_bounds
@@ -31,6 +32,8 @@ class ACRMRIPhantomWidth(PhantomModule):
     title = "Phantom Width"
 
     viewer = MonochromeDicomViewerField(row=0, column=0)
+
+    series_name = StringField(read_only=True)
 
     max_perc = PercField(50, verbose_name="Width position (% of max)")
 
@@ -66,6 +69,15 @@ class ACRMRIPhantomWidth(PhantomModule):
     line_up_slope = LineROIField(name="up slope Line")
     line_horizontal = LineROIField(name="horizontal Line")
     line_down_slope = LineROIField(name="down slope Line")
+
+    def on_image_load(self, viewer: MonochromeDicomViewer) -> None:
+        super().on_image_load(viewer)
+        if viewer.image is not None:
+            if isinstance(viewer.image, Instance):
+                image = viewer.image.series
+            else:
+                image = viewer.image
+            self.series_name = f"{image}"
 
     def draw_rois(self, context: ACRMRIContext, batch: bool = False) -> None:
         if isinstance(self.viewer.image, Instance):

@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from pumpia.module_handling.modules import PhantomModule
 from pumpia.module_handling.fields.roi_fields import RectangleROIField
 from pumpia.module_handling.fields.viewer_fields import MonochromeDicomViewerField
+from pumpia.widgets.viewers import MonochromeDicomViewer
 from pumpia.module_handling.fields.simple import (PercField,
                                                   FloatField,
                                                   StringField,
@@ -48,6 +49,8 @@ class ACRMRISliceWidth(PhantomModule):
 
     viewer = MonochromeDicomViewerField(row=0, column=0)
 
+    series_name = StringField(read_only=True)
+
     tan_theta = FloatField(0.1, verbose_name="Tan of ramp angle")
     max_perc = PercField(50, verbose_name="Height for peak finding (% of max)")
     width_def = PercField(50, verbose_name="Result width position (% of max)")
@@ -74,6 +77,15 @@ class ACRMRISliceWidth(PhantomModule):
     top_uniformity = RectangleROIField()
     bottom_uniformity = RectangleROIField()
 
+    def on_image_load(self, viewer: MonochromeDicomViewer) -> None:
+        super().on_image_load(viewer)
+        if viewer.image is not None:
+            if isinstance(viewer.image, Instance):
+                image = viewer.image.series
+            else:
+                image = viewer.image
+            self.series_name = f"{image}"
+
     def draw_rois(self, context: ACRMRIContext, batch: bool = False) -> None:
 
         if isinstance(self.viewer.image, Instance):
@@ -85,6 +97,8 @@ class ACRMRISliceWidth(PhantomModule):
                 image = self.viewer.image.instances[0]
         else:
             return
+
+        self.viewer.load_image(image)
 
         pixel_size = image.pixel_spacing
         if pixel_size is None:

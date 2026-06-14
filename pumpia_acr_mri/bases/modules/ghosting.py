@@ -6,7 +6,8 @@ This does not follow ACR guidelines
 from pumpia.module_handling.modules import PhantomModule
 from pumpia.module_handling.fields.roi_fields import EllipseROIField, RectangleROIField
 from pumpia.module_handling.fields.viewer_fields import MonochromeDicomViewerField
-from pumpia.module_handling.fields.simple import PercField, FloatField, IntField
+from pumpia.widgets.viewers import MonochromeDicomViewer
+from pumpia.module_handling.fields.simple import PercField, FloatField, IntField, StringField
 from pumpia.image_handling.roi_structures import EllipseROI, RectangleROI
 from pumpia.file_handling.dicom_structures import Series, Instance
 
@@ -24,6 +25,8 @@ class ACRMRIGhosting(PhantomModule):
 
     viewer = MonochromeDicomViewerField(row=0, column=0)
 
+    series_name = StringField(read_only=True)
+
     size = PercField(70, verbose_name="Size (%)")
 
     slice_used = IntField(read_only=True)
@@ -34,6 +37,15 @@ class ACRMRIGhosting(PhantomModule):
     bottom_roi = RectangleROIField("Bottom ROI")
     left_roi = RectangleROIField("Left ROI")
     right_roi = RectangleROIField("Right ROI")
+
+    def on_image_load(self, viewer: MonochromeDicomViewer) -> None:
+        super().on_image_load(viewer)
+        if viewer.image is not None:
+            if isinstance(viewer.image, Instance):
+                image = viewer.image.series
+            else:
+                image = viewer.image
+            self.series_name = f"{image}"
 
     def draw_rois(self, context: ACRMRIContext, batch: bool = False) -> None:
         if isinstance(self.viewer.image, Instance):

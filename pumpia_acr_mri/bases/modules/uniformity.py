@@ -7,10 +7,12 @@ from scipy.signal import convolve2d
 from pumpia.module_handling.modules import PhantomModule
 from pumpia.module_handling.fields.roi_fields import EllipseROIField
 from pumpia.module_handling.fields.viewer_fields import MonochromeDicomViewerField
+from pumpia.widgets.viewers import MonochromeDicomViewer
 from pumpia.module_handling.fields.simple import (PercField,
                                                   FloatField,
                                                   BoolField,
-                                                  IntField)
+                                                  IntField,
+                                                  StringField)
 from pumpia.image_handling.roi_structures import EllipseROI
 from pumpia.file_handling.dicom_structures import Series, Instance
 
@@ -30,6 +32,8 @@ class ACRMRIUniformity(PhantomModule):
 
     viewer = MonochromeDicomViewerField(row=0, column=0)
 
+    series_name = StringField(read_only=True)
+
     size = PercField(70, verbose_name="Size (%)")
     kernel_bool = BoolField(verbose_name="Apply Low Pass Kernel")
 
@@ -39,6 +43,15 @@ class ACRMRIUniformity(PhantomModule):
                             read_only=True)
 
     uniformity_roi = EllipseROIField("Uniformity ROI")
+
+    def on_image_load(self, viewer: MonochromeDicomViewer) -> None:
+        super().on_image_load(viewer)
+        if viewer.image is not None:
+            if isinstance(viewer.image, Instance):
+                image = viewer.image.series
+            else:
+                image = viewer.image
+            self.series_name = f"{image}"
 
     def draw_rois(self, context: ACRMRIContext, batch: bool = False) -> None:
         if isinstance(self.viewer.image, Instance):
